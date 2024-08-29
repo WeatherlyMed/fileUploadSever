@@ -2,81 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/styles.css">
     <title>Mass File Upload</title>
     <script src="https://cdn.jsdelivr.net/npm/resumablejs/resumable.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h2>Upload Files</h2>
-        <input type="file" id="fileInput" multiple>
-        <div id="uploadProgress"></div>
-        <div>
-            <label>Select folder to upload to:</label>
-            <select id="folderSelect">
-                <option value="folder1">Folder 1</option>
-                <option value="folder2">Folder 2</option>
-            </select>
-        </div>
-        <div>
-            <input type="checkbox" id="tosCheckbox" required>
-            <label for="tosCheckbox">I agree to the <a href="/static/terms_of_service.html" target="_blank">Terms of Service</a></label>
-        </div>
-        <button onclick="startUpload()">Upload Files</button>
-    </div>
+    <h1>Upload File</h1>
+    <form action="/" method="post" enctype="multipart/form-data">
+        <label for="file">Choose a file:</label>
+        <input type="file" name="file" id="file" required><br><br>
 
+        <label for="folder">Choose folder:</label>
+        <select name="folder" id="folder" required>
+            <option value="folder1">Folder 1</option>
+            <option value="folder2">Folder 2</option>
+        </select><br><br>
+
+        <label>
+            <input type="checkbox" name="tos" required> I agree to the Terms of Service
+        </label><br><br>
+
+        <label for="password">Enter password:</label>
+        <input type="password" name="password" id="password" required><br><br>
+
+        <input type="submit" value="Upload">
+    </form>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const r = new Resumable({
-                target: '/',
-                query: function () {
-                    return {
-                        folder: document.getElementById('folderSelect').value,
-                        tos: document.getElementById('tosCheckbox').checked ? 'agree' : ''
-                    };
-                },
-                chunkSize: 1 * 1024 * 1024,
-                simultaneousUploads: 5,
-                testChunks: false,
-                throttleProgressCallbacks: 1
-            });
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const folderChoice = document.getElementById('folder').value;
+            const file = fileInput.files[0];
 
-            r.assignBrowse(document.getElementById('fileInput'));
+            if (!file || !folderChoice) {
+                alert('Please select a file and enter a folder choice.');
+                return;
+            }
 
-            r.on('fileAdded', function (file) {
-                const progressElement = document.createElement('div');
-                progressElement.className = 'file-progress';
-                progressElement.innerHTML = `<span>${file.fileName}</span> <span class="progress-bar">0%</span>`;
-                document.getElementById('uploadProgress').appendChild(progressElement);
-            });
+            const chunkSize = 1024 * 1024; // 1 MB chunks
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            const progressDiv = document.getElementById('progress');
+            
+            progressDiv.innerHTML = `Total Chunks to Upload: ${totalChunks}<br>`;
 
-            r.on('fileProgress', function (file) {
-                const progressElements = document.querySelectorAll('.file-progress');
-                progressElements.forEach(function (element) {
-                    if (element.querySelector('span').innerText === file.fileName) {
-                        const progressBar = element.querySelector('.progress-bar');
-                        progressBar.innerText = Math.floor(file.progress() * 100) + '%';
-                    }
-                });
-            });
+            for (let chunkNumber = 1; chunkNumber <= totalChunks; chunkNumber++) {
+                const start = (chunkNumber - 1) * chunkSize;
+                const end = Math.min(file.size, chunkNumber * chunkSize);
+                const chunk = file.slice(start, end);
 
-            r.on('fileSuccess', function (file) {
-                console.log(`${file.fileName} uploaded successfully.`);
-            });
+                const formData = new FormData();
+                formData.append('file', chunk, file.name);
+                formData.append('resumableChunkNumber', chunkNumber);
+                formData.append('resumableTotalChunks', totalChunks);
+                formData.append('folder', folderChoice);
+                await fetch('/', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => response.json())
+                  .then(data => {
+                      progressDiv.innerHTML += `Chunk ${chunkNumber} uploaded.<br>`;
+                  }).catch(error => {
+                      console.error('Error uploading chunk:', error);
+                      progressDiv.innerHTML += `Error uploading chunk ${chunkNumber}.<br>`;
+                  });
+            }
 
-            r.on('fileError', function (file, message) {
-                console.error(`Error uploading ${file.fileName}: ${message}`);
-            });
-
-            window.startUpload = function () {
-                if (!document.getElementById('tosCheckbox').checked) {
-                    alert('You must agree to the Terms of Service.');
-                    return;
-                }
-                r.upload();
-            };
-        });
+            progressDiv.innerHTML += 'File upload complete.';
+        }
     </script>
 </body>
 </html>
