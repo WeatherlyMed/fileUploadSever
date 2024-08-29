@@ -9,6 +9,11 @@ UPLOAD_FOLDER_2 = 'uploads/folder2'
 os.makedirs(UPLOAD_FOLDER_1, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_2, exist_ok=True)
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'txt', 'pdf'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
